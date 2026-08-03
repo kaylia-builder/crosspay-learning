@@ -3,7 +3,6 @@ package com.crosspay.common.config;
 import com.crosspay.module.auth.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,10 +19,11 @@ import java.util.List;
 /**
  * Spring Security 配置
  *
- * 权限模型很简单（学习用）：
+ * 权限模型：
  * - /api/auth/**        → 公开（注册、登录）
  * - /api/callback/**    → 公开（第三方回调不能要求 JWT）
- * - /api/admin/**       → 需要 ADMIN 角色
+ * - /api/admin/**       → 需要 ADMIN 或 OPERATOR 角色
+ * - /api/ai/**          → 需要 ADMIN 或 OPERATOR 角色
  * - /api/merchant/**    → 需要 MERCHANT 角色
  * - /api/payment/**     → 需要 MERCHANT 角色
  * - /api/settlement/**  → 需要 MERCHANT 角色
@@ -48,14 +48,14 @@ public class SecurityConfig {
                 // 公开接口
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/callback/**").permitAll()
-                // 运营端（管理后台是独立登录的）
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // 运营端 — ADMIN 和 OPERATOR 均可访问
+                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "OPERATOR")
+                // AI 助手 — 运营人员使用
+                .requestMatchers("/api/ai/**").hasAnyRole("ADMIN", "OPERATOR")
                 // 商户端
                 .requestMatchers("/api/merchant/**").hasRole("MERCHANT")
                 .requestMatchers("/api/payment/**").hasRole("MERCHANT")
                 .requestMatchers("/api/settlement/**").hasRole("MERCHANT")
-                // AI 助手（运营使用）
-                .requestMatchers("/api/ai/**").hasRole("ADMIN")
                 // 其他全部需要认证
                 .anyRequest().authenticated()
             )

@@ -59,12 +59,15 @@ router.beforeEach((to, _from, next) => {
       next('/login')
       return
     }
-    if (to.meta.role && to.meta.role !== role) {
-      // Wrong role → redirect to their correct home
-      if (role === 'MERCHANT') next('/merchant/dashboard')
-      else if (role === 'ADMIN' || role === 'OPERATOR') next('/admin/merchants')
-      else next('/login')
-      return
+    if (to.meta.role) {
+      // Admin routes allow both ADMIN and OPERATOR
+      const allowedRoles = to.meta.role === 'ADMIN' ? ['ADMIN', 'OPERATOR'] : [to.meta.role as string]
+      if (!allowedRoles.includes(role || '')) {
+        if (role === 'MERCHANT') next('/merchant/dashboard')
+        else if (role === 'ADMIN' || role === 'OPERATOR') next('/admin/merchants')
+        else next('/login')
+        return
+      }
     }
   }
 
