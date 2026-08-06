@@ -40,6 +40,8 @@ const form = reactive({
 async function handleLogin() {
   loading.value = true
   try {
+    // 清除旧会话，避免跨端角色冲突
+    localStorage.clear()
     const res = await adminLogin(form)
     const data = res.data.data
     localStorage.setItem('token', data.token)

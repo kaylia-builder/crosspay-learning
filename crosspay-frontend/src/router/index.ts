@@ -49,20 +49,26 @@ const router = createRouter({
   ],
 })
 
-// Route guard: check auth & role
+// Route guard: check auth & role using to.matched for robust parent-child meta resolution
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('token')
   const role = localStorage.getItem('role')
 
-  if (to.meta.requiresAuth) {
+  // Collect required auth & role from ALL matched route records
+  const requiresAuth = to.matched.some(r => r.meta.requiresAuth)
+  const requiredRole = to.matched.find(r => r.meta.role)?.meta?.role as string | undefined
+
+  if (requiresAuth) {
     if (!token) {
-      next('/login')
+      // Save intended path so we can redirect back after login
+      next(role === 'ADMIN' || role === 'OPERATOR' ? '/admin/login' : '/login')
       return
     }
-    if (to.meta.role) {
+    if (requiredRole) {
       // Admin routes allow both ADMIN and OPERATOR
-      const allowedRoles = to.meta.role === 'ADMIN' ? ['ADMIN', 'OPERATOR'] : [to.meta.role as string]
+      const allowedRoles = requiredRole === 'ADMIN' ? ['ADMIN', 'OPERATOR'] : [requiredRole]
       if (!allowedRoles.includes(role || '')) {
+        // Role mismatch: redirect to the appropriate home for the current role
         if (role === 'MERCHANT') next('/merchant/dashboard')
         else if (role === 'ADMIN' || role === 'OPERATOR') next('/admin/merchants')
         else next('/login')
@@ -71,8 +77,8 @@ router.beforeEach((to, _from, next) => {
     }
   }
 
-  // Already logged in → don't go to login
-  if (to.path === '/login' && token) {
+  // Already logged in → redirect away from login pages to appropriate home
+  if ((to.path === '/login' || to.path === '/admin/login') && token) {
     if (role === 'ADMIN' || role === 'OPERATOR') next('/admin/merchants')
     else next('/merchant/dashboard')
     return

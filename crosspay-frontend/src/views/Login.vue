@@ -50,6 +50,8 @@ async function handleLogin() {
   await formRef.value.validate()
   loading.value = true
   try {
+    // 清除旧会话，避免跨端角色冲突
+    localStorage.clear()
     const res = await login(form)
     const data = res.data.data
     localStorage.setItem('token', data.token)
