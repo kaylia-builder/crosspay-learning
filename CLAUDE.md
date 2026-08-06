@@ -44,9 +44,13 @@
 ## Startup
 
 ```bash
-docker compose up -d mysql redis
-cd crosspay-backend && mvn spring-boot:run
-cd crosspay-frontend && npm install && npm run dev
+# Ensure MySQL & Redis are running (Docker Hub unreachable in this env)
+sudo systemctl start mysql redis-server
+# Init database (first time only)
+mysql -u root -proot123 crosspay < crosspay-backend/src/main/resources/db/migration/V1__init_schema.sql
+# Start services
+cd crosspay-backend && mvn spring-boot:run &
+cd crosspay-frontend && npm install && npm run dev &
 # Merchant: http://localhost:3000/login
 # Admin: http://localhost:3000/admin/login
 ```
@@ -58,6 +62,16 @@ cd crosspay-frontend && npm install && npm run dev
 - Public → `/api/auth/**`, `/api/callback/**`
 
 ## Session Notes
+
+### 2026-08-06 — Environment Setup & Bug Fixes
+
+- **Docker 不可用**：Docker Hub 网络不通（IPv4/IPv6 均超时），改用 apt 安装本地 MySQL 8.4 + Redis
+- **MySQL 8.4 兼容**：`mysql_native_password` 插件已移除，需用 `caching_sha2_password`
+- **密码哈希错误**：迁移脚本中的 bcrypt 哈希不匹配 `admin123`/`merchant123`，用 python bcrypt 重新生成并更新数据库
+- **前端 Vite 别名**：`@` 别名需同时在 tsconfig.json 和 vite.config.ts（resolve.alias）中配置
+- **全角字符编译错误**：`AiAssistantService.java:108-110` 使用了中文引号 `"\""` 和全角问号 `？`，替换为 ASCII 字符
+- **Dashboard 硬编码**：`MerchantService.getDashboard()` 返回硬编码 0，改为从 PaymentRepository 实时查询今日交易笔数/金额/成功率
+- **跨端角色冲突**：同一浏览器 localStorage 的 role 会被 admin/merchant 互相覆盖，登录页加 `localStorage.clear()`，路由守卫改用 `to.matched`
 
 ### 2026-08-03 — Initial Build
 
