@@ -2,10 +2,14 @@ package com.crosspay.module.merchant;
 
 import com.crosspay.common.exception.BusinessException;
 import com.crosspay.module.merchant.entity.Merchant;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import com.crosspay.module.payment.PaymentRepository;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,9 +23,12 @@ import java.util.Map;
 public class MerchantService {
 
     private final MerchantRepository merchantRepository;
+    private final PaymentRepository paymentRepository;
 
-    public MerchantService(MerchantRepository merchantRepository) {
+    public MerchantService(MerchantRepository merchantRepository,
+                           PaymentRepository paymentRepository) {
         this.merchantRepository = merchantRepository;
+        this.paymentRepository = paymentRepository;
     }
 
     /**
@@ -33,13 +40,25 @@ public class MerchantService {
     }
 
     /**
-     * 商户首页 Dashboard 数据
-     * 真实系统这会是一堆聚合查询（今日交易额、成功率、待结算金额等）
+     * 商户首页 Dashboard — 实时统计今日交易数据
      */
     public Map<String, Object> getDashboard(Long merchantId) {
         Merchant merchant = getMerchant(merchantId);
 
-        // TODO: Module 2 完成后替换为真实统计数据
+        // 今日 00:00:00 ~ 现在
+        LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+
+        long totalCount = paymentRepository.countTodayByMerchant(merchantId, todayStart);
+        BigDecimal totalAmount = paymentRepository.sumTodayAmountByMerchant(merchantId, todayStart);
+        long successCount = paymentRepository.countTodaySuccessByMerchant(merchantId, todayStart);
+
+        String successRate = totalCount > 0
+                ? BigDecimal.valueOf(successCount)
+                    .divide(BigDecimal.valueOf(totalCount), 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .setScale(0, RoundingMode.HALF_UP) + "%"
+                : "0%";
+
         Map<String, Object> dashboard = new HashMap<>();
         dashboard.put("merchantNo", merchant.getMerchantNo());
         dashboard.put("name", merchant.getName());
@@ -47,9 +66,9 @@ public class MerchantService {
         dashboard.put("currency", merchant.getCurrency());
         dashboard.put("feeRate", merchant.getFeeRate().toString());
         dashboard.put("status", merchant.getStatus());
-        dashboard.put("todayTransactionCount", 0);
-        dashboard.put("todayTransactionAmount", "0.00");
-        dashboard.put("successRate", "0%");
+        dashboard.put("todayTransactionCount", totalCount);
+        dashboard.put("todayTransactionAmount", totalAmount != null ? totalAmount.setScale(2, RoundingMode.HALF_UP).toString() : "0.00");
+        dashboard.put("successRate", successRate);
         return dashboard;
     }
 }
